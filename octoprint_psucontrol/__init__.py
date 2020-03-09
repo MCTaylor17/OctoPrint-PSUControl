@@ -507,12 +507,15 @@ class PSUControl(octoprint.plugin.StartupPlugin,
     
     def hook_klipper_restart(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
         if gcode == self.pseudoOnGCodeCommand:
+            self._logger.info("Adding Klipper restart routine")
             return [("FIRMWARE_RESTART",),          # Restart Klipper firmware to connect to printer
                     (self.pseudoOnGCodeCommand,)]   # Pass command through
 
     def hook_klipper_timeout(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
         if gcode == "FIRMWARE_RESTART":
+            self._logger.info("Sleeping while waiting for Klipper")
             time.sleep(5000)                        # Wait long enough for Klipper to connect to printer
+            self._logger.info("Awake now")
             return None
 
 
