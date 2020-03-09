@@ -504,6 +504,17 @@ class PSUControl(octoprint.plugin.StartupPlugin,
 
             if skipQueuing:
                 return (None,)
+    
+    def hook_klipper_restart(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+        if gcode == self.pseudoOnGCodeCommand:
+            return [("FIRMWARE_RESTART",),          # Restart Klipper firmware to connect to printer
+                    (self.pseudoOnGCodeCommand,)]   # Pass command through
+
+    def hook_klipper_timeout(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+        if gcode == "FIRMWARE_RESTART":
+            time.sleep(5000)                        # Wait long enough for Klipper to connect to printer
+            return None
+
 
     def turn_psu_on(self):
         if self.switchingMethod == 'GCODE' or self.switchingMethod == 'GPIO' or self.switchingMethod == 'SYSTEM':
@@ -777,6 +788,8 @@ def __plugin_load__():
 
     global __plugin_hooks__
     __plugin_hooks__ = {
-        "octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing,
+        "octoprint.comm.protocol.gcode.queuing": [__plugin_implementation__.hook_gcode_queuing, 
+                                                  __plugin_implementation__.hook_klipper_restart],
+        "octoprint.comm.protocol.gcode.sent": __plugin_implementation__.hook_klipper_timeout,
         "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
     }
