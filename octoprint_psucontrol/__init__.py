@@ -98,7 +98,7 @@ class PSUControl(octoprint.plugin.StartupPlugin,
         self.pseudoOffGCodeCommand = ''
         self.enableKlipperRestart = True
         self.klipperRestartCommand = 'FIRMWARE_RESTART'
-        self.klipperRestartDelay = 5000.0
+        self.klipperRestartDelay = 5.0
         self.postOnDelay = 0.0
         self.autoOn = False
         self.autoOnTriggerGCodeCommands = ''
@@ -552,9 +552,9 @@ class PSUControl(octoprint.plugin.StartupPlugin,
                 self._noSensing_isPSUOn = True
 
             self._logger.info("Restarting Klipper Firmware")
-            time.sleep(3000)
+            time.sleep(5)
             self._printer.command(self.klipperRestartCommand)
-            time.sleep(0.1 + self.postOnDelay)
+            time.sleep(5.1 + self.postOnDelay)
 
             self.check_psu_state()
         
@@ -640,7 +640,7 @@ class PSUControl(octoprint.plugin.StartupPlugin,
             pseudoOffGCodeCommand = 'M81',
             enableKlipperRestart = True,
             klipperRestartCommand = 'FIRMWARE_RESTART',
-            klipperRestartDelay = 5000.0,
+            klipperRestartDelay = 5.0,
             postOnDelay = 0.0,
             disconnectOnPowerOff = False,
             sensingMethod = 'INTERNAL',
