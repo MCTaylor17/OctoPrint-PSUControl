@@ -6,6 +6,7 @@ __license__ = "GNU Affero General Public License http://www.gnu.org/licenses/agp
 __copyright__ = "Copyright (C) 2017 Shawn Bruce - Released under terms of the AGPLv3 License"
 
 import octoprint.plugin
+import octoprint.printer
 from octoprint.server import user_permission
 import time
 import subprocess
@@ -96,6 +97,9 @@ class PSUControl(octoprint.plugin.StartupPlugin,
         self.enablePseudoOnOff = False
         self.pseudoOnGCodeCommand = ''
         self.pseudoOffGCodeCommand = ''
+        self.enableKlipperRestart = True
+        self.klipperRestartCommand = 'FIRMWARE_RESTART'
+        self.klipperRestartDelay = 5000.0
         self.postOnDelay = 0.0
         self.autoOn = False
         self.autoOnTriggerGCodeCommands = ''
@@ -160,6 +164,15 @@ class PSUControl(octoprint.plugin.StartupPlugin,
 
         self.pseudoOffGCodeCommand = self._settings.get(["pseudoOffGCodeCommand"])
         self._logger.debug("pseudoOffGCodeCommand: %s" % self.pseudoOffGCodeCommand)
+
+        self.enableKlipperRestart = self._settings.get_boolean(["enableKlipperRestart"])
+        self._logger.debug("enableKlipperRestart: %s" % self.enableKlipperRestart)
+
+        self.klipperRestartCommand = self._settings.get(["klipperRestartCommand"])
+        self._logger.debug("klipperRestartCommand: %s" % self.klipperRestartCommand)
+
+        self.klipperRestartDelay = self._settings.get_float(["klipperRestartDelay"])
+        self._logger.debug("klipperRestartDelay: %s" % self.klipperRestartDelay)
 
         self.postOnDelay = self._settings.get_float(["postOnDelay"])
         self._logger.debug("postOnDelay: %s" % self.postOnDelay)
@@ -505,20 +518,6 @@ class PSUControl(octoprint.plugin.StartupPlugin,
             if skipQueuing:
                 return (None,)
     
-    def hook_klipper_restart(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-        if gcode == self.pseudoOnGCodeCommand:
-            self._logger.info("Adding Klipper restart routine")
-            return [("FIRMWARE_RESTART",),          # Restart Klipper firmware to connect to printer
-                    (self.pseudoOnGCodeCommand,)]   # Pass command through
-
-    def hook_klipper_timeout(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
-        if gcode == "FIRMWARE_RESTART":
-            self._logger.info("Sleeping while waiting for Klipper")
-            time.sleep(5000)                        # Wait long enough for Klipper to connect to printer
-            self._logger.info("Awake now")
-            return None
-
-
     def turn_psu_on(self):
         if self.switchingMethod == 'GCODE' or self.switchingMethod == 'GPIO' or self.switchingMethod == 'SYSTEM':
             self._logger.info("Switching PSU On")
@@ -552,8 +551,13 @@ class PSUControl(octoprint.plugin.StartupPlugin,
 
             if self.sensingMethod not in ('GPIO','SYSTEM'):
                 self._noSensing_isPSUOn = True
-         
-            time.sleep(0.1 + self.postOnDelay)
+
+            if self.enableKlipperRestart:
+                self._printer.command(self.klipperRestartCommand)
+                time.sleep(0.1 + max(self.klipperRestartDelay, self.postOnDelay))
+            else:
+                time.sleep(0.1 + self.postOnDelay)
+
             self.check_psu_state()
         
     def turn_psu_off(self):
@@ -636,6 +640,9 @@ class PSUControl(octoprint.plugin.StartupPlugin,
             enablePseudoOnOff = False,
             pseudoOnGCodeCommand = 'M80',
             pseudoOffGCodeCommand = 'M81',
+            enableKlipperRestart = True,
+            klipperRestartCommand = 'FIRMWARE_RESTART',
+            klipperRestartDelay = 5000.0,
             postOnDelay = 0.0,
             disconnectOnPowerOff = False,
             sensingMethod = 'INTERNAL',
@@ -675,6 +682,9 @@ class PSUControl(octoprint.plugin.StartupPlugin,
         self.enablePseudoOnOff = self._settings.get_boolean(["enablePseudoOnOff"])
         self.pseudoOnGCodeCommand = self._settings.get(["pseudoOnGCodeCommand"])
         self.pseudoOffGCodeCommand = self._settings.get(["pseudoOffGCodeCommand"])
+        self.enableKlipperRestart = self._settings.get(["enableKlipperRestart"])
+        self.klipperRestartCommand = self._settings.get(["klipperRestartCommand"])
+        self.klipperRestartDelay = self._settings.get(["klipperRestartDelay"])
         self.postOnDelay = self._settings.get_float(["postOnDelay"])
         self.disconnectOnPowerOff = self._settings.get_boolean(["disconnectOnPowerOff"])
         self.sensingMethod = self._settings.get(["sensingMethod"])
@@ -791,8 +801,6 @@ def __plugin_load__():
 
     global __plugin_hooks__
     __plugin_hooks__ = {
-        "octoprint.comm.protocol.gcode.queuing": [__plugin_implementation__.hook_gcode_queuing, 
-                                                  __plugin_implementation__.hook_klipper_restart],
-        "octoprint.comm.protocol.gcode.sent": __plugin_implementation__.hook_klipper_timeout,
+        "octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing,
         "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
     }
