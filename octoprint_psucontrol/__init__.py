@@ -551,11 +551,10 @@ class PSUControl(octoprint.plugin.StartupPlugin,
             if self.sensingMethod not in ('GPIO','SYSTEM'):
                 self._noSensing_isPSUOn = True
 
-            if self.enableKlipperRestart:
-                self._printer.command(self.klipperRestartCommand)
-                time.sleep(0.1 + max(self.klipperRestartDelay, self.postOnDelay))
-            else:
-                time.sleep(0.1 + self.postOnDelay)
+            self._logger.info("Restarting Klipper Firmware")
+            time.sleep(3000)
+            self._printer.command(self.klipperRestartCommand)
+            time.sleep(0.1 + self.postOnDelay)
 
             self.check_psu_state()
         
